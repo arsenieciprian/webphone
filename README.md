@@ -1,121 +1,90 @@
-📘 Voxbee Operator Pro – Documentation
-
-Voxbee Operator Pro is a specialized WebRTC webphone module for FusionPBX.
-It replaces the standard phone interface with a full-screen, 3-column dispatcher console, designed for high-volume operators who need call handling, notes, and call history in a single unified view.
+📘 Voxbee Operator Pro - Documentation
+Voxbee Operator Pro is a specialized WebRTC webphone module for FusionPBX. It replaces the standard phone interface with a full-screen, 3-column dispatcher console, designed for high-volume operators who need call history, notes, and quick dialing controls in a single view.
 
 ⚠️ Prerequisites & Critical Security Warning
+WebRTC technology has strict security requirements. This application WILL NOT WORK if these conditions are not met:
 
-WebRTC requires a secure environment. This application WILL NOT WORK unless all conditions below are met:
+HTTPS: FusionPBX must be accessed via https://.
 
-Requirement	Details
-HTTPS	FusionPBX must be accessed via https://
-Valid SSL Certificate	A trusted certificate is mandatory (e.g. Let’s Encrypt)
-No Self-Signed Certs	❌ Self-signed or “Generated” certificates will block WSS
-WSS Port Open	Port 7443 (or your custom WSS port) must be reachable
+Valid SSL: You MUST use a valid, trusted certificate (e.g., Let's Encrypt).
 
-Important: If your browser shows “Not Secure”, the phone will not register.
+No Self-Signed: ❌ Self-signed certificates will block the Secure WebSocket (WSS) connection.
+
+WSS Port: Ensure port 7443 (or your configured WSS port) is open.
+
+Note: If your browser shows a "Not Secure" warning in the address bar, the phone will fail to register.
 
 🌟 Features
 1. Smart Menu Integration
+The application includes a dynamic menu script (app_menu.php) that automatically detects the correct parent UUID for "Applications" on your specific server.
 
-Includes a dynamic app_menu.php script that automatically detects the correct Applications menu UUID, regardless of database structure.
-
-Benefit:
-✔ Works out-of-the-box on any FusionPBX installation
-✔ No manual menu editing required
-✔ Survives upgrades without losing menu entries
+Benefit: Works instantly on any FusionPBX installation, regardless of database customization.
 
 2. Full-Screen Dispatcher Layout
+A professional 3-column design:
 
-Professional 3-column operator console:
+Left Panel: Real-time list of active calls with status indicators.
 
-Left Panel: Real-time active calls with status indicators
+Center Console: Large dial pad, call timer, and active note-taking area.
 
-Center Panel: Large dial pad, call timer, and live note-taking
-
-Right Panel: Persistent call history (not lost on refresh)
+Right Panel: Persistent call history (doesn't disappear on refresh).
 
 3. Productivity Tools
+Real-Time Notes: Add notes during a call; they are automatically saved to the history log.
 
-✍️ Real-Time Notes – saved automatically to call history
+One-Click Export: Download your entire call history and notes to CSV format for reporting.
 
-📊 CSV Export – download full call history with notes
-
-⌨️ Keyboard Dialing – use the numeric keypad for fast dialing
+Keyboard Shortcuts: Use your physical keyboard's numpad to dial numbers instantly.
 
 📥 Installation Guide
 Step 1: Install the Files
+Access your FusionPBX server via SSH and clone the repository into the applications directory.
 
-Connect to your FusionPBX server via SSH and clone the repository:
-
-cd /var/www/fusionpbx/app
-git clone https://github.com/arsenieciprian/webphone.git
+cd /var/www/fusionpbx/app git clone https://github.com/arsenieciprian/webphone.git
 
 Step 2: Set Permissions
-
-Ensure the web server user owns the files:
+Ensure the web server has ownership of the files.
 
 chown -R www-data:www-data /var/www/fusionpbx/app/webphone
 
-Step 3: Register the Application
+Step 3: Register the App
+You must register the application in the FusionPBX database.
 
-Log in to FusionPBX as Superadmin
+Log in to FusionPBX as Superadmin.
 
-Go to Advanced → Upgrade
+Navigate to Advanced -> Upgrade.
 
-Enable:
+Select the following options:
 
-✅ App Defaults
+☑️ App Defaults
 
-✅ Menu Defaults
+☑️ Menu Defaults
 
-✅ Permission Defaults
+☑️ Permission Defaults
 
-Click Execute
+Click Execute.
 
-Step 4: Access the Application
+Step 4: Access
+Log out and log back in to refresh your session.
 
-Log out and log back in
+Go to the Applications menu.
 
-Navigate to Applications
-
-Click Webphone
+Click on Webphone.
 
 🔧 Configuration & Customization
 Language
-
-The interface is currently hardcoded in Romanian.
-
-To translate it:
-
-Edit index.php
-
-Replace text strings (example: Apelează → Call)
+The interface is currently hardcoded in Romanian. To translate it to English or another language, edit the index.php file and replace the text strings (e.g., replace "Apelează" with "Call").
 
 SIP Configuration
+The application automatically retrieves SIP credentials (extension and password) for the currently logged-in user using the FusionPBX database. No manual configuration is required on the client side.
 
-No manual SIP setup required.
+❓ Troubleshooting
+Connection Status: "Offline" / "Registration Failed"
+Check SSL: Open Developer Tools (F12) -> Console. If you see ERR_CERT_AUTHORITY_INVALID, your certificate is not trusted.
 
-The application automatically retrieves:
+Check WSS: Ensure port 7443 is allowed in your firewall.
 
-Extension
+"Webphone" Menu Missing
+If the menu does not appear under "Applications", verify that you ran the Menu Defaults upgrade step.
 
-SIP password
-
-…for the currently logged-in user directly from the FusionPBX database.
-
-🧠 Credits & Acknowledgements
-
-This project was made possible with the help of:
-
-Google Gemini – AI assistance for logic, structure, and implementation ideas
-
-JsSIP – JavaScript SIP over WebRTC library
-🔗 https://jssip.net/
-
-Special thanks to the open-source community around FusionPBX and FreeSWITCH.
-
-📄 License
-
-This project is provided as-is.
-You are free to modify and adapt it for your own FusionPBX deployments.
+The app_menu.php script attempts to find the "Applications" parent menu automatically. If your menu structure is heavily modified, check v_menu_items in your database.
