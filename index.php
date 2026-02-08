@@ -44,7 +44,7 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
 
 <style>
     /* --- LAYOUT GENERAL --- */
-    body { overflow: hidden; background-color: #ecf0f1; } 
+    body { overflow: hidden; background-color: #ecf0f1; margin: 0; padding: 0; } 
     
     .vox-app-container {
         display: flex;
@@ -57,6 +57,7 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
         overflow: hidden;
         border: 1px solid #bdc3c7;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        position: relative;
     }
 
     /* --- COLORS --- */
@@ -69,6 +70,23 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
         --accent-red: #c0392b;
         --accent-yellow: #f1c40f;
         --text-color: #34495e;
+    }
+
+    /* AUDIO WARNING BANNER */
+    #audioWarning {
+        display: none;
+        width: 100%;
+        background-color: var(--accent-red);
+        color: white;
+        text-align: center;
+        padding: 15px;
+        font-weight: bold;
+        cursor: pointer;
+        font-size: 1.1rem;
+        z-index: 9999;
+        position: fixed;
+        top: 0; left: 0;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
     }
 
     /* --- COLOANA 1: SIDEBAR (STANGA) --- */
@@ -208,6 +226,10 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
 
 </style>
 
+<div id="audioWarning" onclick="initAudio()">
+    ⚠️ BROWSERUL A BLOCAT SUNETUL. CLICK AICI PENTRU A ACTIVA! ⚠️
+</div>
+
 <div class="vox-app-container">
     
     <div class="col-side">
@@ -298,7 +320,7 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
     let ua = null;
     let sessions = {}; 
     let activeSessionId = null; 
-    let ringtoneInterval = null;
+    let toneInterval = null; // Unificat pentru toate tonurile
     let editingHistoryId = null;
 
     const UI = {
@@ -318,31 +340,94 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
         detContent: document.getElementById('detContent'),
         detNote: document.getElementById('detNoteInput'),
         btnSaveNote: document.getElementById('btnSaveNote'),
-        btnCallHist: document.getElementById('btnCallFromHist')
+        btnCallHist: document.getElementById('btnCallFromHist'),
+        warning: document.getElementById('audioWarning')
     };
 
+    // --- AUDIO SYSTEM (SINE + TONES) ---
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    function unlockAudio() { if(audioCtx.state === 'suspended') audioCtx.resume(); }
 
-    function manageRingtone() {
-        const ringing = Object.values(sessions).some(s => s.direction === 'incoming' && !s.isEstablished());
-        const active = Object.values(sessions).some(s => s.isEstablished());
-        if (ringing && !active) { if (!ringtoneInterval) startRing(); } else { stopRing(); }
+    function initAudio() {
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume().then(() => {
+                UI.warning.style.display = 'none';
+            });
+        } else {
+            UI.warning.style.display = 'none';
+        }
     }
 
-    function startRing() {
-        const beep = () => {
-            const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-            o.frequency.value = 440; g.gain.value = 0.1;
-            o.connect(g); g.connect(audioCtx.destination);
-            o.start(); o.stop(audioCtx.currentTime + 1);
-        };
-        beep(); ringtoneInterval = setInterval(beep, 3000);
+    // Activare automata la orice interactiune
+    document.body.addEventListener('click', initAudio);
+    document.body.addEventListener('keydown', initAudio);
+    document.body.addEventListener('touchstart', initAudio);
+
+    // Functie universala de redare ton
+    function playTone(type) {
+        // VERIFICARE CRITICA: Daca avem apel activ (vorbim), NU redam nimic
+        const isTalking = Object.values(sessions).some(s => s.isEstablished());
+        if (isTalking) return; 
+
+        initAudio();
+        if(audioCtx.state === 'suspended') { UI.warning.style.display = 'block'; return; }
+        
+        stopTone(); // Oprim orice alt ton inainte
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        const now = audioCtx.currentTime;
+
+        if (type === 'ring') {
+            // Ringtone clasic (Sine Wave, finut)
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(440, now); // Nota La
+            gain.gain.value = 0.5;
+            osc.start();
+            
+            // Loop manual la 3 secunde
+            osc.stop(now + 1.5); // Suna 1.5s
+            toneInterval = setInterval(() => {
+                if (isTalking) { stopTone(); return; } // Dubla verificare
+                playTone('ring');
+            }, 3000);
+            
+        } else if (type === 'busy') {
+            // Busy Tone (Ocupat) - Bip rapid
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(480, now);
+            gain.gain.value = 0.4;
+            osc.start();
+            osc.stop(now + 0.3); // Scurt 0.3s
+            
+            // Loop rapid
+            toneInterval = setInterval(() => {
+                 if (isTalking) { stopTone(); return; }
+                 const o2 = audioCtx.createOscillator(); const g2 = audioCtx.createGain();
+                 o2.connect(g2); g2.connect(audioCtx.destination);
+                 o2.frequency.value = 480; g2.gain.value = 0.4;
+                 o2.start(); o2.stop(audioCtx.currentTime + 0.3);
+            }, 600); // Repeta la 0.6s
+
+        } else if (type === 'error') {
+            // Error Tone (Slide in jos)
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(1000, now);
+            osc.frequency.exponentialRampToValueAtTime(200, now + 0.5);
+            gain.gain.value = 0.4;
+            osc.start();
+            osc.stop(now + 0.5);
+        }
     }
-    function stopRing() { if(ringtoneInterval) { clearInterval(ringtoneInterval); ringtoneInterval = null; } }
+
+    function stopTone() {
+        if(toneInterval) { clearInterval(toneInterval); toneInterval = null; }
+    }
 
     function toggleRegister() {
-        unlockAudio();
+        initAudio();
         if (ua && ua.isRegistered()) {
             ua.stop(); 
             UI.btnReg.innerText = "Conectează SIP"; 
@@ -365,18 +450,45 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
             ua.on('registered', () => {
                 UI.statusText.innerText = `Online (${SIP_CONFIG.user})`; UI.statusDot.className = 'status-dot online';
                 UI.btnReg.innerText = "Deconectează"; UI.btnReg.className = "btn-reg active";
+                initAudio();
             });
             ua.on('unregistered', () => { UI.statusText.innerText = "Offline"; UI.statusDot.className = 'status-dot'; });
             ua.on('registrationFailed', () => { UI.statusText.innerText = "Eroare Login"; UI.btnReg.className = "btn-reg inactive"; });
 
             ua.on('newRTCSession', (data) => {
-                const s = data.session; s.data.note = ""; s.data.startTime = null; sessions[s.id] = s;
+                const s = data.session;
+                s.data = { note: "", startTime: null }; 
+                sessions[s.id] = s;
+                
                 if (s.direction === 'incoming') {
-                    manageRingtone();
-                    s.on('ended', () => { removeSession(s.id); manageRingtone(); });
-                    s.on('failed', () => { addToHistory(s, 'Missed'); removeSession(s.id); manageRingtone(); });
+                    // Verificam sa nu fim deja in apel
+                    const active = Object.values(sessions).some(sess => sess.isEstablished());
+                    if (!active) playTone('ring');
+                    
+                    s.on('ended', () => { removeSession(s.id); stopTone(); });
+                    s.on('failed', () => { addToHistory(s, 'Missed'); removeSession(s.id); stopTone(); });
                 } else {
-                    if(activeSessionId) holdSession(activeSessionId); setupConfirmed(s);
+                    // Outgoing
+                    if(activeSessionId) holdSession(activeSessionId); 
+                    setupConfirmed(s);
+
+                    // Ascultam pentru BUSY sau EROARE
+                    s.on('failed', (e) => {
+                        console.log("Call failed:", e.cause);
+                        stopTone(); // Oprim orice alt ton
+                        
+                        // Logica detectare ton
+                        const cause = e.cause || "";
+                        if (cause.match(/Busy|Incompatible/i) || cause === '486') {
+                            playTone('busy');
+                            setTimeout(stopTone, 3000); // Oprim busy dupa 3 secunde
+                        } else if (cause.match(/Not Found|Address Incomplete|404/i)) {
+                            playTone('error');
+                        }
+                        
+                        addToHistory(s, 'Failed', s.data.note); 
+                        removeSession(s.id); 
+                    });
                 }
                 updateUI();
             });
@@ -385,16 +497,31 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
     }
 
     function answerCall(id) {
-        unlockAudio(); const s = sessions[id]; if(!s) return;
+        initAudio(); 
+        stopTone(); // Oprim soneria
+        const s = sessions[id]; if(!s) return;
         if(activeSessionId && sessions[activeSessionId]) holdSession(activeSessionId);
-        s.answer({ mediaConstraints: {audio:true, video:false} }); setupConfirmed(s); manageRingtone();
+        s.answer({ mediaConstraints: {audio:true, video:false} }); setupConfirmed(s);
     }
-    function rejectCall(id) { if(sessions[id]) sessions[id].terminate(); }
+    
+    function rejectCall(id) { 
+        stopTone(); 
+        if(sessions[id]) sessions[id].terminate(); 
+    }
 
     function setupConfirmed(s) {
-        s.on('confirmed', () => { s.data.startTime = new Date(); setActive(s.id); manageRingtone(); });
-        s.on('ended', () => { addToHistory(s, 'Ended', s.data.note); removeSession(s.id); manageRingtone(); });
-        s.on('failed', () => { addToHistory(s, 'Failed', s.data.note); removeSession(s.id); manageRingtone(); });
+        stopTone(); // Siguranta: oprim orice ton
+        s.on('confirmed', () => { 
+            stopTone(); // Dubla siguranta
+            s.data.startTime = new Date(); 
+            setActive(s.id); 
+        });
+        s.on('ended', () => { addToHistory(s, 'Ended', s.data.note); removeSession(s.id); stopTone(); });
+        // Handler-ul de failed pentru outgoing e deja pus in newRTCSession
+        if (s.direction === 'incoming') {
+             s.on('failed', () => { addToHistory(s, 'Failed', s.data.note); removeSession(s.id); stopTone(); });
+        }
+        
         if(s.connection) s.connection.addEventListener('track', e => { UI.audio.srcObject = e.streams[0]; UI.audio.play(); });
         updateUI();
     }
@@ -414,7 +541,7 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
         updateUI();
     }
 
-    // --- LOOP PRINCIPAL UI & TIMER ---
+    // --- LOOP UI & TIMER ---
     function updateUI() {
         renderSidebar(); 
         if (activeSessionId && sessions[activeSessionId]) {
@@ -427,58 +554,68 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
     }
     setInterval(updateUI, 1000);
 
-    // --- RECONNECTION & KEEP-ALIVE ---
+    // --- RECONNECTION ---
     setInterval(() => {
         if (ua && !ua.isConnected() && UI.btnReg.classList.contains('active')) {
-            console.warn("Voxbee: Connection lost. Reconnecting...");
+            if (Object.keys(sessions).length > 0) return; 
+            console.warn("Voxbee: Reconnecting...");
             UI.statusText.innerText = "Reconectare...";
             UI.statusDot.className = "status-dot reconnect";
             ua.start();
         }
-    }, 5000);
+    }, 10000);
 
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") {
             if (ua && !ua.isConnected() && UI.btnReg.classList.contains('active')) {
-                console.log("Voxbee: Tab woke up. Reconnecting...");
+                if (Object.keys(sessions).length > 0) return;
                 ua.start();
             }
         }
     });
 
-    window.addEventListener('online', () => {
-         if (ua && !ua.isConnected() && UI.btnReg.classList.contains('active')) {
-             console.log("Voxbee: Network online. Reconnecting...");
-             ua.start();
-         }
-    });
-
-
     function renderSidebar() {
-        UI.sidebar.innerHTML = ''; const ids = Object.keys(sessions);
-        if(ids.length === 0) { UI.sidebar.innerHTML = '<li style="padding:15px; text-align:center; font-size:0.8rem; opacity:0.6;">Niciun apel activ</li>'; return; }
+        UI.sidebar.innerHTML = ''; 
+        const ids = Object.keys(sessions);
+        
+        if(ids.length === 0) { 
+            UI.sidebar.innerHTML = '<li style="padding:15px; text-align:center; font-size:0.8rem; opacity:0.6;">Niciun apel activ</li>'; 
+            return; 
+        }
 
         ids.forEach(id => {
-            const s = sessions[id];
-            const isRing = (s.direction === 'incoming' && !s.isEstablished());
-            const isHold = s.isOnHold().local;
-            
-            const li = document.createElement('li');
-            let css = 'mini-card'; let status = ""; let icon = "";
-            if (isRing) { css += ' mc-ringing'; status = "Se sună..."; icon="🔔"; }
-            else if (isHold) { css += ' mc-hold'; status = "În așteptare"; icon="⏸️"; }
-            else { css += ' mc-active'; status = "Conectat"; icon="🔊"; }
-            
-            let actions = isRing ? `<div class="mc-actions"><button class="btn-mc bg-green" onclick="event.stopPropagation(); answerCall('${id}')">Răspunde</button><button class="btn-mc bg-red" onclick="event.stopPropagation(); rejectCall('${id}')">Respinge</button></div>` : "";
-            let dur = ""; if(s.data.startTime) dur = fmtTime(Math.floor((new Date() - s.data.startTime)/1000));
+            try {
+                const s = sessions[id];
+                if (!s) return; 
 
-            // Nota in Sidebar
-            let noteHtml = s.data.note ? `<span class="mc-note">📝 ${s.data.note}</span>` : '';
+                const isRing = (s.direction === 'incoming' && !s.isEstablished());
+                const isHold = s.isOnHold().local;
+                
+                let remoteUser = "Necunoscut";
+                if(s.remote_identity && s.remote_identity.uri) remoteUser = s.remote_identity.uri.user;
 
-            li.className = css;
-            li.innerHTML = `<div class="mc-info"><span class="mc-num">${icon} ${s.remote_identity.uri.user}</span><span class="mc-dur">${dur}</span></div><span class="mc-status">${status}</span>${noteHtml}${actions}`;
-            if(!isRing) li.onclick = () => switchTo(id);
-            UI.sidebar.appendChild(li);
+                const li = document.createElement('li');
+                let css = 'mini-card'; let status = ""; let icon = "";
+                
+                if (isRing) { css += ' mc-ringing'; status = "Se sună..."; icon="🔔"; }
+                else if (isHold) { css += ' mc-hold'; status = "În așteptare"; icon="⏸️"; }
+                else { css += ' mc-active'; status = "Conectat"; icon="🔊"; }
+                
+                let actions = isRing ? `<div class="mc-actions"><button class="btn-mc bg-green" onclick="event.stopPropagation(); answerCall('${id}')">Răspunde</button><button class="btn-mc bg-red" onclick="event.stopPropagation(); rejectCall('${id}')">Respinge</button></div>` : "";
+                
+                let dur = ""; 
+                if(s.data && s.data.startTime) {
+                    dur = fmtTime(Math.floor((new Date() - s.data.startTime)/1000));
+                }
+
+                let noteHtml = (s.data && s.data.note) ? `<span class="mc-note">📝 ${s.data.note}</span>` : '';
+
+                li.className = css;
+                li.innerHTML = `<div class="mc-info"><span class="mc-num">${icon} ${remoteUser}</span><span class="mc-dur">${dur}</span></div><span class="mc-status">${status}</span>${noteHtml}${actions}`;
+                
+                if(!isRing) li.onclick = () => switchTo(id);
+                UI.sidebar.appendChild(li);
+            } catch (err) { console.error("Eroare randare sidebar:", err); }
         });
     }
 
@@ -489,15 +626,23 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
             UI.timer.style.display = 'none'; UI.notesArea.style.display = 'none';
             UI.controls.innerHTML = `<button onclick="makeCall()" class="btn-action bg-green"><span>📞</span> APELEAZĂ</button>`;
         } else {
-            UI.input.value = s.remote_identity.uri.user; UI.input.disabled = true; UI.dialpad.style.display = 'none';
-            UI.timer.style.display = 'block'; 
-            UI.timer.innerText = s.data.startTime ? fmtTime((new Date()-s.data.startTime)/1000) : "00:00";
+            let rUser = (s.remote_identity && s.remote_identity.uri) ? s.remote_identity.uri.user : "Apel";
+            UI.input.value = rUser; 
             
-            UI.notesArea.style.display = 'block'; UI.notes.value = s.data.note; 
+            UI.input.disabled = true; UI.dialpad.style.display = 'none';
+            UI.timer.style.display = 'block'; 
+            
+            let timeVal = "00:00";
+            if (s.data && s.data.startTime) {
+                timeVal = fmtTime((new Date()-s.data.startTime)/1000);
+            }
+            UI.timer.innerText = timeVal;
+            
+            UI.notesArea.style.display = 'block'; 
+            UI.notes.value = (s.data && s.data.note) ? s.data.note : ""; 
             
             UI.notes.oninput = (e) => { 
-                s.data.note = e.target.value; 
-                renderSidebar(); 
+                if(s.data) { s.data.note = e.target.value; renderSidebar(); }
             };
             
             const isHeld = s.isOnHold().local;
@@ -510,7 +655,7 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
 
     function makeCall() {
         const dest = UI.input.value; if(!dest) return alert("Scrie un număr!");
-        unlockAudio();
+        initAudio();
         navigator.mediaDevices.getUserMedia({audio:true}).then(() => {
             ua.call(dest, { mediaConstraints: {audio:true,video:false}, pcConfig: { iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }] } });
         }).catch(()=>alert("Permisiune microfon refuzată!"));
@@ -533,14 +678,23 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
 
     function addToHistory(session, status, note) {
         const hist = JSON.parse(localStorage.getItem('vox_history') || '[]');
+        
+        let rUser = "Necunoscut";
+        if(session.remote_identity && session.remote_identity.uri) rUser = session.remote_identity.uri.user;
+
+        let dur = '00:00';
+        if (session.data && session.data.startTime) {
+            dur = fmtTime(Math.floor((new Date()-session.data.startTime)/1000));
+        }
+
         hist.unshift({
             id: Date.now() + Math.random().toString(16).slice(2),
-            num: session.remote_identity.uri.user,
+            num: rUser,
             dir: session.direction === 'incoming' ? 'Intrare' : 'Ieșire',
             status: status,
             date: new Date().toLocaleDateString(),
             time: new Date().toLocaleTimeString(),
-            duration: session.data.startTime ? fmtTime(Math.floor((new Date()-session.data.startTime)/1000)) : '00:00',
+            duration: dur,
             note: note || ""
         });
         localStorage.setItem('vox_history', JSON.stringify(hist));
