@@ -85,6 +85,7 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
     .op-status { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-weight: bold; font-size: 1.1rem; }
     .status-dot { width: 12px; height: 12px; background: #95a5a6; border-radius: 50%; transition: 0.3s; }
     .status-dot.online { background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); }
+    .status-dot.reconnect { background: var(--accent-yellow); animation: blink 1s infinite; }
 
     .btn-reg {
         width: 100%; padding: 8px; border: 1px solid #7f8c8d; background: transparent; color: #bdc3c7;
@@ -112,7 +113,7 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
     .mc-dur { font-size: 0.8rem; font-family: monospace; }
     .mc-status { font-size: 0.75rem; opacity: 0.8; display: block; margin-top: 4px; }
     
-    /* STIL NOU PENTRU NOTA IN SIDEBAR */
+    /* Nota in Sidebar */
     .mc-note { 
         font-size: 0.75rem; 
         color: var(--accent-yellow); 
@@ -203,6 +204,7 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
     .modal-box { background: white; width: 400px; padding: 25px; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
 
     @keyframes flash { 0% { border-color: var(--accent-blue); } 50% { border-color: transparent; } 100% { border-color: var(--accent-blue); } }
+    @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
 
 </style>
 
@@ -342,8 +344,12 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
     function toggleRegister() {
         unlockAudio();
         if (ua && ua.isRegistered()) {
-            ua.stop(); UI.btnReg.innerText = "Conectează SIP"; UI.btnReg.className = "btn-reg inactive";
-        } else { initUA(); }
+            ua.stop(); 
+            UI.btnReg.innerText = "Conectează SIP"; 
+            UI.btnReg.className = "btn-reg inactive";
+        } else { 
+            initUA(); 
+        }
     }
 
     function initUA() {
@@ -408,7 +414,7 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
         updateUI();
     }
 
-    // --- LOOP PRINCIPAL UI ---
+    // --- LOOP PRINCIPAL UI & TIMER ---
     function updateUI() {
         renderSidebar(); 
         if (activeSessionId && sessions[activeSessionId]) {
@@ -420,6 +426,33 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
         }
     }
     setInterval(updateUI, 1000);
+
+    // --- RECONNECTION & KEEP-ALIVE ---
+    setInterval(() => {
+        if (ua && !ua.isConnected() && UI.btnReg.classList.contains('active')) {
+            console.warn("Voxbee: Connection lost. Reconnecting...");
+            UI.statusText.innerText = "Reconectare...";
+            UI.statusDot.className = "status-dot reconnect";
+            ua.start();
+        }
+    }, 5000);
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+            if (ua && !ua.isConnected() && UI.btnReg.classList.contains('active')) {
+                console.log("Voxbee: Tab woke up. Reconnecting...");
+                ua.start();
+            }
+        }
+    });
+
+    window.addEventListener('online', () => {
+         if (ua && !ua.isConnected() && UI.btnReg.classList.contains('active')) {
+             console.log("Voxbee: Network online. Reconnecting...");
+             ua.start();
+         }
+    });
+
 
     function renderSidebar() {
         UI.sidebar.innerHTML = ''; const ids = Object.keys(sessions);
@@ -439,7 +472,7 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
             let actions = isRing ? `<div class="mc-actions"><button class="btn-mc bg-green" onclick="event.stopPropagation(); answerCall('${id}')">Răspunde</button><button class="btn-mc bg-red" onclick="event.stopPropagation(); rejectCall('${id}')">Respinge</button></div>` : "";
             let dur = ""; if(s.data.startTime) dur = fmtTime(Math.floor((new Date() - s.data.startTime)/1000));
 
-            // AICI ESTE NOUTATEA: NOTITA IN SIDEBAR
+            // Nota in Sidebar
             let noteHtml = s.data.note ? `<span class="mc-note">📝 ${s.data.note}</span>` : '';
 
             li.className = css;
@@ -462,10 +495,9 @@ echo "<style>.action_bar { display: none; } #footer { display: none; }</style>\n
             
             UI.notesArea.style.display = 'block'; UI.notes.value = s.data.note; 
             
-            // UPDATE IN TIMP REAL LA SIDEBAR
             UI.notes.oninput = (e) => { 
                 s.data.note = e.target.value; 
-                renderSidebar(); // Actualizam imediat lista din stanga
+                renderSidebar(); 
             };
             
             const isHeld = s.isOnHold().local;
