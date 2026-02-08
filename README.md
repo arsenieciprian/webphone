@@ -1,73 +1,121 @@
-Voxbee Operator Pro - Documentation
+📘 Voxbee Operator Pro – Documentation
 
 Voxbee Operator Pro is a specialized WebRTC webphone module for FusionPBX.
-It replaces the standard phone interface with a full-screen, 3-column dispatcher console,
-designed for high-volume operators who need call handling, notes, and call history in a single unified view.
+It replaces the standard phone interface with a full-screen, 3-column dispatcher console, designed for high-volume operators who need call handling, notes, and call history in a single unified view.
 
-PREREQUISITES & SECURITY WARNING
+⚠️ Prerequisites & Critical Security Warning
 
 WebRTC requires a secure environment. This application WILL NOT WORK unless all conditions below are met:
 
-- FusionPBX must be accessed via HTTPS
-- A valid trusted SSL certificate is required (e.g. Let's Encrypt)
-- Self-signed or generated certificates will block WSS connections
-- WSS port 7443 (or your custom port) must be open and reachable
+Requirement	Details
+HTTPS	FusionPBX must be accessed via https://
+Valid SSL Certificate	A trusted certificate is mandatory (e.g. Let’s Encrypt)
+No Self-Signed Certs	❌ Self-signed or “Generated” certificates will block WSS
+WSS Port Open	Port 7443 (or your custom WSS port) must be reachable
 
-If the browser shows "Not Secure", the phone will not register.
+Important: If your browser shows “Not Secure”, the phone will not register.
 
-FEATURES
-
+🌟 Features
 1. Smart Menu Integration
-Dynamic app_menu.php script automatically detects the correct Applications menu UUID.
-Works out-of-the-box on any FusionPBX installation and survives upgrades.
+
+Includes a dynamic app_menu.php script that automatically detects the correct Applications menu UUID, regardless of database structure.
+
+Benefit:
+✔ Works out-of-the-box on any FusionPBX installation
+✔ No manual menu editing required
+✔ Survives upgrades without losing menu entries
 
 2. Full-Screen Dispatcher Layout
-- Left panel: real-time active calls
-- Center panel: dial pad, call timer, live notes
-- Right panel: persistent call history
+
+Professional 3-column operator console:
+
+Left Panel: Real-time active calls with status indicators
+
+Center Panel: Large dial pad, call timer, and live note-taking
+
+Right Panel: Persistent call history (not lost on refresh)
 
 3. Productivity Tools
-- Real-time call notes
-- CSV export of call history
-- Keyboard numeric pad dialing
 
-INSTALLATION
+✍️ Real-Time Notes – saved automatically to call history
 
-1. Install files
+📊 CSV Export – download full call history with notes
+
+⌨️ Keyboard Dialing – use the numeric keypad for fast dialing
+
+📥 Installation Guide
+Step 1: Install the Files
+
+Connect to your FusionPBX server via SSH and clone the repository:
+
 cd /var/www/fusionpbx/app
 git clone https://github.com/arsenieciprian/webphone.git
 
-2. Set permissions
+Step 2: Set Permissions
+
+Ensure the web server user owns the files:
+
 chown -R www-data:www-data /var/www/fusionpbx/app/webphone
 
-3. Register application
-Login as Superadmin
-Advanced -> Upgrade
+Step 3: Register the Application
+
+Log in to FusionPBX as Superadmin
+
+Go to Advanced → Upgrade
+
 Enable:
-- App Defaults
-- Menu Defaults
-- Permission Defaults
+
+✅ App Defaults
+
+✅ Menu Defaults
+
+✅ Permission Defaults
+
 Click Execute
 
-4. Access
-Logout and login again
-Applications -> Webphone
+Step 4: Access the Application
 
-CONFIGURATION
+Log out and log back in
 
+Navigate to Applications
+
+Click Webphone
+
+🔧 Configuration & Customization
 Language
-Interface text is hardcoded in Romanian.
-Edit index.php to translate strings.
+
+The interface is currently hardcoded in Romanian.
+
+To translate it:
+
+Edit index.php
+
+Replace text strings (example: Apelează → Call)
 
 SIP Configuration
-SIP credentials are automatically retrieved for the logged-in user from the FusionPBX database.
 
-CREDITS
+No manual SIP setup required.
 
-- Google Gemini (AI assistance)
-- JsSIP JavaScript SIP over WebRTC library https://jssip.net/
-- FusionPBX & FreeSWITCH open-source community
+The application automatically retrieves:
 
-LICENSE
+Extension
 
-Provided as-is. Free to modify for FusionPBX deployments.
+SIP password
+
+…for the currently logged-in user directly from the FusionPBX database.
+
+🧠 Credits & Acknowledgements
+
+This project was made possible with the help of:
+
+Google Gemini – AI assistance for logic, structure, and implementation ideas
+
+JsSIP – JavaScript SIP over WebRTC library
+🔗 https://jssip.net/
+
+Special thanks to the open-source community around FusionPBX and FreeSWITCH.
+
+📄 License
+
+This project is provided as-is.
+You are free to modify and adapt it for your own FusionPBX deployments.
