@@ -47,3 +47,55 @@ Access your FusionPBX server via SSH and clone the repository into the applicati
 ```bash
 cd /var/www/fusionpbx/app
 git clone [https://github.com/arsenieciprian/webphone.git](https://github.com/arsenieciprian/webphone.git)
+
+### 2. Set Permissions
+Ensure the web server user owns the files to allow proper execution.
+
+```bash
+chown -R www-data:www-data /var/www/fusionpbx/app/webphone
+
+
+
+3. Register the App
+You must register the application in the FusionPBX database.
+
+Log in to the FusionPBX Web Interface as Superadmin.
+
+Navigate to Advanced -> Upgrade.
+
+Check the following options:
+
+✅ App Defaults
+
+✅ Menu Defaults
+
+✅ Permission Defaults
+
+Click Execute at the top right.
+
+4. Access
+Log out and log back in to refresh your session.
+
+Go to the Applications menu.
+
+Click on Webphone.
+
+🔧 Configuration
+Language
+The interface is currently hardcoded in Romanian. To translate it to English or another language:
+
+Edit index.php.
+
+Replace text strings (e.g., replace "Apelează" with "Call", "Observații" with "Notes").
+
+SIP Configuration
+The application is Zero-Config for the client. It automatically retrieves SIP credentials (extension and password) for the currently logged-in user directly from the FusionPBX database.
+
+🧠 Credits & Acknowledgements
+This project was built with the assistance of Google Gemini (AI) for logic implementation, UI structure, and dynamic menu scripting.
+
+Powered by the excellent open-source library:
+
+JsSIP - The JavaScript SIP library.
+
+License: MIT
